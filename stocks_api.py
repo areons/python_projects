@@ -4,26 +4,30 @@ from requests import Session
 import datetime
 from twilio.rest import Client
 from requests.exceptions import ConnectionError, Timeout, TooManyRedirects
+from dotenv import load_dotenv
 
+load_dotenv()
 
+# Variation for tracking
+VARIATION = 7
+#stocks data
 STOCK_NAME = "NVDA"
 COMPANY_NAME = "NVIDIA Corp"
-
+#Twilio configs
+TWILIO_NUMBER = os.getenv('TWILIO_NUMBER')
+NUMBER = os.getenv('NUMBER')
 #stocks api parameters
 STOCKS_ENDPOINT = "https://www.alphavantage.co/query"
-STOCKS_API_KEY = os.environ.get('STOCKS_API_KEY')
-
+STOCKS_API_KEY = os.getenv('STOCKS_API_KEY')
 #crypto tracking api parameters
 CRYPTO_ENDPOINT = 'https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest'
-CRYPTO_API_KEY = os.environ.get('CRYPTO_API_KEY')
-
+CRYPTO_API_KEY = os.getenv('CRYPTO_API_KEY')
 #news api parameters
 NEWS_ENDPOINT = "https://newsapi.org/v2/everything"
-NEWS_API_KEY = os.environ.get('NEWS_API_KEY')
-
+NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 #twilio api parameters
-ACCOUNT_SID = 'ACCOUNT_SID HERE'
-AUTH_TOKEN = 'AUTH_TOKEN HERE'
+ACCOUNT_SID = os.getenv('ACCOUNT_SID')
+AUTH_TOKEN = os.getenv('AUTH_TOKEN')
 
 
 STOCK_PARAMETERS = {
@@ -98,7 +102,7 @@ if crypto_data:
         print("Error processing crypto data:", e)
         price = None
         percent_change_24h = None
-
+#Crypto news
 try:
     crypto_news_response = requests.get(url=NEWS_ENDPOINT, params=CRYPTO_NEWS_PARAMETERS)
     crypto_news_response.raise_for_status()
@@ -110,21 +114,26 @@ except Exception as e:
     crypto_articles = []
 
     # Create formatted articles
-if percent_change_24h is not None and abs(percent_change_24h) > 7:
+if percent_change_24h is not None and abs(percent_change_24h) > VARIATION:
     up_down = '🔺' if percent_change_24h > 0 else '🔻'
     now = datetime.datetime.now().strftime('%d-%m-%Y')
-    crypto_lean_articles = [f'BTC: {up_down}{abs(round(percent_change_24h, 1))}%\nPrice: ${round(price, 1)}\nHeadline: {art["title"]}\nBrief: {art["description"]}'
+    crypto_lean_articles = [f'Headline: {art["title"]}\nBrief: {art["description"]}\nSource: {art['url']}'
     for art in crypto_articles
     ]
 
 # Send crypto alert if significant change
     try:
         client = Client(ACCOUNT_SID, AUTH_TOKEN)
+        message = client.messages.create(
+                from_=f'whatsapp:+{TWILIO_NUMBER}',
+                to=f'whatsapp:+{NUMBER}',
+                body=f'BTC: {up_down}{abs(round(percent_change_24h, 1))}%\nPrice: ${round(price, 1)}'
+            )
 
         for crypto_article in crypto_lean_articles:
             message = client.messages.create(
-                from_='whatsapp:+NUMBER HERE',
-                to='whatsapp:+NUMBER HERE',
+                from_=f'whatsapp:+{TWILIO_NUMBER}',
+                to=f'whatsapp:+{NUMBER}',
                 body=crypto_article
             )
             print(message.sid)
@@ -151,7 +160,7 @@ if stock_data is not None:
         up_down = '🔺' if dif_price > 0 else '🔻'
         percentual_dif_price = round((dif_price / price_previous) * 100, 1)
 
-        if abs(percentual_dif_price) > 7:
+        if abs(percentual_dif_price) > VARIATION:
             try:
                 news_response = requests.get(url=NEWS_ENDPOINT, params=NEWS_PARAMETERS)
                 news_response.raise_for_status()
@@ -168,8 +177,8 @@ if stock_data is not None:
 
                 for article in lean_articles:
                     message = client.messages.create(
-                        from_='whatsapp:+NUMBER HERE',
-                        to='whatsapp:+NUMBER HERE',
+                        from_=f'whatsapp:+{TWILIO_NUMBER}',
+                        to=f'whatsapp:+{NUMBER}',
                         body=article
                     )
                 print(message.sid)
